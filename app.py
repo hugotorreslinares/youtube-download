@@ -74,6 +74,26 @@ def get_video_info():
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            # Configuración anti-bot
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['mweb', 'web'],
+                    'player_skip': ['webpage'],
+                }
+            },
+            # Headers personalizados
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            },
+            # Otras opciones
+            'socket_timeout': 30,
+            'retries': 3,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -158,6 +178,27 @@ def download_video():
             'outtmpl': outtmpl,
             'logger': DownloadLogger(download_id),
             'progress_hooks': [lambda d: progress_hook(d, download_id)],
+            # Configuración anti-bot
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['mweb', 'web'],
+                    'player_skip': ['webpage'],
+                }
+            },
+            # Headers personalizados
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            },
+            # Otras opciones
+            'socket_timeout': 30,
+            'retries': 3,
+            'no_warnings': True,
         }
         
         def download_thread():
