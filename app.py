@@ -22,6 +22,91 @@ if not os.path.exists(DOWNLOAD_FOLDER):
 # Almacén de progreso de descargas
 download_progress = {}
 
+def create_ytdl_options(strategy='mweb', download_opts=None):
+    """Crear configuración de yt-dlp según estrategia"""
+    base_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'ignoreerrors': True,
+        'socket_timeout': 60,
+        'retries': 10,
+        'fragment_retries': 10,
+        'file_access_retries': 3,
+    }
+    
+    if download_opts:
+        base_opts.update(download_opts)
+    
+    if strategy == 'mweb':
+        # Estrategia recomendada por la documentación
+        base_opts.update({
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['mweb'],
+                    'player_skip': ['webpage', 'configs'],
+                    'skip': ['hls', 'dash'],
+                },
+                'youtubetab': {'skip': ['webpage']}
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36',
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://m.youtube.com/',
+                'Origin': 'https://m.youtube.com',
+            }
+        })
+    elif strategy == 'android':
+        # Fallback: cliente Android
+        base_opts.update({
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android'],
+                    'player_skip': ['webpage'],
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
+                'X-YouTube-Client-Name': '3',
+                'X-YouTube-Client-Version': '17.31.35',
+            }
+        })
+    elif strategy == 'web':
+        # Fallback: cliente web simple
+        base_opts.update({
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web'],
+                    'player_skip': ['configs'],
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            }
+        })
+    
+    return base_opts
+
+def extract_video_info_with_fallback(url):
+    """Intentar extraer información del video con múltiples estrategias"""
+    strategies = ['mweb', 'android', 'web']
+    
+    for strategy in strategies:
+        try:
+            ydl_opts = create_ytdl_options(strategy)
+            ydl_opts['format'] = 'best[height<=720]'  # Formato simple para info
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if info:
+                    return info, strategy
+        except Exception as e:
+            continue
+    
+    # Si todas las estrategias fallan
+    raise Exception("No se pudo extraer información del video con ninguna estrategia disponible")
+
 def get_version_info():
     """Obtener información de versión desde Git"""
     try:
@@ -122,68 +207,39 @@ def get_video_info():
         if not any(domain in url for domain in youtube_domains):
             return jsonify({'error': 'URL debe ser de YouTube'}), 400
         
-        # Configuración avanzada según documentación oficial yt-dlp
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'ignoreerrors': True,  # Continuar con errores
-            # Configuración anti-bot avanzada
-            'extractor_args': {
-                'youtube': {
-                    # Múltiples clientes como fallback
-                    'player_client': ['android', 'mweb', 'web'],
-                    # Skip webpage para evitar detección
-                    'player_skip': ['webpage', 'configs'],
-                },
-                'youtubetab': {
-                    'skip': ['webpage'],  # Skip webpage para tabs
-                }
-            },
-            # Headers de Android/Mobile
-            'http_headers': {
-                'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
-                'X-YouTube-Client-Name': '3',
-                'X-YouTube-Client-Version': '17.31.35',
-            },
-            # Otras opciones
-            'socket_timeout': 60,
-            'retries': 5,
-            'fragment_retries': 5,
+        # Usar sistema de fallback con múltiples estrategias
+        info, used_strategy = extract_video_info_with_fallback(url)
+        
+        # Verificar que se obtuvo información válida
+        if info is None:
+            return jsonify({'error': 'No se pudo extraer información del video'}), 400
+        
+        # Obtener formatos disponibles
+        formats = []
+        if info.get('formats'):
+            for fmt in info['formats']:
+                if fmt and (fmt.get('vcodec') != 'none' or fmt.get('acodec') != 'none'):
+                    formats.append({
+                        'format_id': fmt.get('format_id'),
+                        'ext': fmt.get('ext'),
+                        'quality': fmt.get('format_note', 'Unknown'),
+                        'filesize': fmt.get('filesize'),
+                        'vcodec': fmt.get('vcodec'),
+                        'acodec': fmt.get('acodec')
+                    })
+        
+        video_info = {
+            'title': info.get('title', 'Sin título'),
+            'duration': info.get('duration', 0),
+            'uploader': info.get('uploader', 'Desconocido'),
+            'view_count': info.get('view_count', 0),
+            'thumbnail': info.get('thumbnail'),
+            'description': info.get('description', ''),
+            'upload_date': info.get('upload_date'),
+            'formats': formats[:10]  # Limitar a 10 formatos principales
         }
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            
-            # Verificar que se obtuvo información válida
-            if info is None:
-                return jsonify({'error': 'No se pudo extraer información del video'}), 400
-            
-            # Obtener formatos disponibles
-            formats = []
-            if info.get('formats'):
-                for fmt in info['formats']:
-                    if fmt and (fmt.get('vcodec') != 'none' or fmt.get('acodec') != 'none'):
-                        formats.append({
-                            'format_id': fmt.get('format_id'),
-                            'ext': fmt.get('ext'),
-                            'quality': fmt.get('format_note', 'Unknown'),
-                            'filesize': fmt.get('filesize'),
-                            'vcodec': fmt.get('vcodec'),
-                            'acodec': fmt.get('acodec')
-                        })
-            
-            video_info = {
-                'title': info.get('title', 'Sin título'),
-                'duration': info.get('duration', 0),
-                'uploader': info.get('uploader', 'Desconocido'),
-                'view_count': info.get('view_count', 0),
-                'thumbnail': info.get('thumbnail'),
-                'description': info.get('description', ''),
-                'upload_date': info.get('upload_date'),
-                'formats': formats[:10]  # Limitar a 10 formatos principales
-            }
-            
-            return jsonify(video_info)
+        return jsonify(video_info)
             
     except Exception as e:
         return jsonify({'error': f'Error al obtener información del video: {str(e)}'}), 400
@@ -241,37 +297,15 @@ def download_video():
             
             outtmpl = os.path.join(DOWNLOAD_FOLDER, f'{download_id}_%(title)s.%(ext)s')
         
-        # Configuración avanzada para descarga
-        ydl_opts = {
+        # Usar configuración optimizada con fallback
+        download_opts = {
             'format': format_selector,
             'outtmpl': outtmpl,
             'logger': DownloadLogger(download_id),
             'progress_hooks': [lambda d: progress_hook(d, download_id)],
-            'no_warnings': True,
-            'ignoreerrors': True,  # Continuar con errores
-            # Configuración anti-bot avanzada
-            'extractor_args': {
-                'youtube': {
-                    # Múltiples clientes como fallback
-                    'player_client': ['android', 'mweb', 'web'],
-                    # Skip webpage para evitar detección
-                    'player_skip': ['webpage', 'configs'],
-                },
-                'youtubetab': {
-                    'skip': ['webpage'],  # Skip webpage para tabs
-                }
-            },
-            # Headers de Android/Mobile
-            'http_headers': {
-                'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
-                'X-YouTube-Client-Name': '3',
-                'X-YouTube-Client-Version': '17.31.35',
-            },
-            # Otras opciones
-            'socket_timeout': 60,
-            'retries': 5,
-            'fragment_retries': 5,
         }
+        
+        ydl_opts = create_ytdl_options('mweb', download_opts)
         
         def download_thread():
             try:
