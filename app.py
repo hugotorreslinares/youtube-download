@@ -61,14 +61,23 @@ def index():
 def get_video_info():
     """Obtener información del video sin descargarlo"""
     try:
+        # Validar que se reciba JSON válido
         data = request.get_json()
-        url = data.get('url', '').strip()
+        if data is None:
+            return jsonify({'error': 'JSON válido requerido'}), 400
         
+        # Obtener y validar URL
+        url = data.get('url')
+        if url is None:
+            return jsonify({'error': 'Campo "url" requerido'}), 400
+            
+        url = str(url).strip()
         if not url:
-            return jsonify({'error': 'URL requerida'}), 400
+            return jsonify({'error': 'URL no puede estar vacía'}), 400
         
         # Validar URL de YouTube
-        if not any(domain in url for domain in ['youtube.com/watch', 'youtu.be/', 'youtube.com/shorts']):
+        youtube_domains = ['youtube.com/watch', 'youtu.be/', 'youtube.com/shorts']
+        if not any(domain in url for domain in youtube_domains):
             return jsonify({'error': 'URL debe ser de YouTube'}), 400
         
         # Configuración avanzada según documentación oficial yt-dlp
@@ -103,11 +112,15 @@ def get_video_info():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
+            # Verificar que se obtuvo información válida
+            if info is None:
+                return jsonify({'error': 'No se pudo extraer información del video'}), 400
+            
             # Obtener formatos disponibles
             formats = []
-            if 'formats' in info:
+            if info.get('formats'):
                 for fmt in info['formats']:
-                    if fmt.get('vcodec') != 'none' or fmt.get('acodec') != 'none':
+                    if fmt and (fmt.get('vcodec') != 'none' or fmt.get('acodec') != 'none'):
                         formats.append({
                             'format_id': fmt.get('format_id'),
                             'ext': fmt.get('ext'),
@@ -137,13 +150,22 @@ def get_video_info():
 def download_video():
     """Iniciar descarga de video"""
     try:
+        # Validar que se reciba JSON válido
         data = request.get_json()
-        url = data.get('url', '').strip()
+        if data is None:
+            return jsonify({'error': 'JSON válido requerido'}), 400
+        
+        # Obtener y validar URL
+        url = data.get('url')
+        if url is None:
+            return jsonify({'error': 'Campo "url" requerido'}), 400
+            
+        url = str(url).strip()
+        if not url:
+            return jsonify({'error': 'URL no puede estar vacía'}), 400
+            
         quality = data.get('quality', 'best')
         audio_only = data.get('audio_only', False)
-        
-        if not url:
-            return jsonify({'error': 'URL requerida'}), 400
         
         # Generar ID único para esta descarga
         download_id = str(uuid.uuid4())
