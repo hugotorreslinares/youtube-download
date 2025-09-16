@@ -459,6 +459,19 @@ body {
     margin-bottom: 5px;
 }
 
+.version-info {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    opacity: 0.7;
+}
+
+.version-info small {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'Courier New', monospace;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {

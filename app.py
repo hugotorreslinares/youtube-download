@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import json
+import subprocess
 from flask import Flask, render_template, request, jsonify, send_file, abort
 from flask_cors import CORS
 import yt_dlp
@@ -20,6 +21,47 @@ if not os.path.exists(DOWNLOAD_FOLDER):
 
 # Almacén de progreso de descargas
 download_progress = {}
+
+def get_version_info():
+    """Obtener información de versión desde Git"""
+    try:
+        # Obtener hash del commit actual
+        commit_hash = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'], 
+            cwd=os.getcwd(),
+            stderr=subprocess.DEVNULL
+        ).decode('utf-8').strip()
+        
+        # Obtener fecha del último commit
+        commit_date = subprocess.check_output(
+            ['git', 'log', '-1', '--format=%cd', '--date=short'], 
+            cwd=os.getcwd(),
+            stderr=subprocess.DEVNULL
+        ).decode('utf-8').strip()
+        
+        # Obtener rama actual
+        branch = subprocess.check_output(
+            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
+            cwd=os.getcwd(),
+            stderr=subprocess.DEVNULL
+        ).decode('utf-8').strip()
+        
+        return {
+            'version': f'v1.0.{commit_hash}',
+            'commit': commit_hash,
+            'date': commit_date,
+            'branch': branch,
+            'build_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+        }
+    except Exception:
+        # Fallback si Git no está disponible
+        return {
+            'version': 'v1.0.0',
+            'commit': 'unknown',
+            'date': 'unknown',
+            'branch': 'unknown',
+            'build_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+        }
 
 class DownloadLogger:
     def __init__(self, download_id):
@@ -310,6 +352,11 @@ def cleanup_download(download_id):
 def list_downloads():
     """Listar descargas activas"""
     return jsonify(download_progress)
+
+@app.route('/api/version')
+def get_version():
+    """Obtener información de versión de la aplicación"""
+    return jsonify(get_version_info())
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

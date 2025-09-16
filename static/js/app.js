@@ -4,6 +4,7 @@ class YouTubeDownloader {
         this.progressInterval = null;
         this.initializeElements();
         this.attachEventListeners();
+        this.loadVersion();
     }
 
     initializeElements() {
@@ -40,6 +41,9 @@ class YouTubeDownloader {
         
         // Error elements
         this.errorMessage = document.getElementById('errorMessage');
+        
+        // Version element
+        this.versionTag = document.getElementById('versionTag');
     }
 
     attachEventListeners() {
@@ -112,6 +116,23 @@ class YouTubeDownloader {
     formatSpeed(speed) {
         if (!speed) return '0 B/s';
         return this.formatBytes(speed) + '/s';
+    }
+    
+    async loadVersion() {
+        try {
+            const response = await fetch('/api/version');
+            const versionData = await response.json();
+            
+            if (response.ok) {
+                const versionText = `${versionData.version} (${versionData.date}) - ${versionData.commit}`;
+                this.versionTag.textContent = versionText;
+                this.versionTag.title = `Branch: ${versionData.branch}, Build: ${versionData.build_time}`;
+            } else {
+                this.versionTag.textContent = 'Versión no disponible';
+            }
+        } catch (error) {
+            this.versionTag.textContent = 'Versión no disponible';
+        }
     }
 
     async getVideoInfo() {
