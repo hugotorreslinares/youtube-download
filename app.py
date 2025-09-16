@@ -71,29 +71,33 @@ def get_video_info():
         if not any(domain in url for domain in ['youtube.com/watch', 'youtu.be/', 'youtube.com/shorts']):
             return jsonify({'error': 'URL debe ser de YouTube'}), 400
         
+        # Configuración avanzada según documentación oficial yt-dlp
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            # Configuración anti-bot
+            'ignoreerrors': True,  # Continuar con errores
+            # Configuración anti-bot avanzada
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['mweb', 'web'],
-                    'player_skip': ['webpage'],
+                    # Múltiples clientes como fallback
+                    'player_client': ['android', 'mweb', 'web'],
+                    # Skip webpage para evitar detección
+                    'player_skip': ['webpage', 'configs'],
+                },
+                'youtubetab': {
+                    'skip': ['webpage'],  # Skip webpage para tabs
                 }
             },
-            # Headers personalizados
+            # Headers de Android/Mobile
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1'
+                'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
+                'X-YouTube-Client-Name': '3',
+                'X-YouTube-Client-Version': '17.31.35',
             },
             # Otras opciones
-            'socket_timeout': 30,
-            'retries': 3,
+            'socket_timeout': 60,
+            'retries': 5,
+            'fragment_retries': 5,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -173,32 +177,36 @@ def download_video():
             
             outtmpl = os.path.join(DOWNLOAD_FOLDER, f'{download_id}_%(title)s.%(ext)s')
         
+        # Configuración avanzada para descarga
         ydl_opts = {
             'format': format_selector,
             'outtmpl': outtmpl,
             'logger': DownloadLogger(download_id),
             'progress_hooks': [lambda d: progress_hook(d, download_id)],
-            # Configuración anti-bot
+            'no_warnings': True,
+            'ignoreerrors': True,  # Continuar con errores
+            # Configuración anti-bot avanzada
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['mweb', 'web'],
-                    'player_skip': ['webpage'],
+                    # Múltiples clientes como fallback
+                    'player_client': ['android', 'mweb', 'web'],
+                    # Skip webpage para evitar detección
+                    'player_skip': ['webpage', 'configs'],
+                },
+                'youtubetab': {
+                    'skip': ['webpage'],  # Skip webpage para tabs
                 }
             },
-            # Headers personalizados
+            # Headers de Android/Mobile
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1'
+                'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
+                'X-YouTube-Client-Name': '3',
+                'X-YouTube-Client-Version': '17.31.35',
             },
             # Otras opciones
-            'socket_timeout': 30,
-            'retries': 3,
-            'no_warnings': True,
+            'socket_timeout': 60,
+            'retries': 5,
+            'fragment_retries': 5,
         }
         
         def download_thread():
